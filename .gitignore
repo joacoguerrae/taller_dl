@@ -1,0 +1,21 @@
+# === Archivos de datos pesados ===
+Regularizacion/*.csv
+data/
+*.zip
+*.tar.gz
+
+# === Carpetas temporales del sistema ===
+__MACOSX/
+.DS_Store
+Thumbs.db
+
+# === Entornos locales ===
+.env/
+.venv/
+env/
+venv/
+*.egg-info/
+
+# === Archivos temporales de notebooks ===
+.ipynb_checkpoints/
+*.pyc

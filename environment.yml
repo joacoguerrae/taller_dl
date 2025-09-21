@@ -1,0 +1,19 @@
+name: taller-dl
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.12
+  - ipykernel
+  - conda-forge::pytorch
+  - conda-forge::torchvision
+  - conda-forge::torchaudio
+  - numpy
+  - scikit-learn
+  - matplotlib
+  - pandas
+  - nltk
+  - kaggle
+  - pip
+  - pip:
+    - torchinfo
