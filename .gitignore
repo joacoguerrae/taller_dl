@@ -8,6 +8,7 @@ data/
 __MACOSX/
 .DS_Store
 Thumbs.db
+wandb/
 
 # === Entornos locales ===
 .env/
