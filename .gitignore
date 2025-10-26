@@ -3,6 +3,7 @@ Regularizacion/*.csv
 data/
 *.zip
 *.tar.gz
+tarea_2/*.csv
 
 # === Carpetas temporales del sistema ===
 __MACOSX/
