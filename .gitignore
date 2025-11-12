@@ -4,6 +4,8 @@ data/
 *.zip
 *.tar.gz
 tarea_2/*.csv
+obligatorio/train
+obligatorio/test
 
 # === Carpetas temporales del sistema ===
 __MACOSX/
