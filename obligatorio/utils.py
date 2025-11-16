@@ -21,13 +21,18 @@ def evaluate(model, criterion, data_loader, device):
     """
     model.eval()  # ponemos el modelo en modo de evaluacion
     total_loss = 0  # acumulador de la perdida
+    total_dice = 0  # acumulador del dice score
+
     with torch.no_grad():  # deshabilitamos el calculo de gradientes
         for x, y in data_loader:  # iteramos sobre el dataloader
             x = x.to(device)  # movemos los datos al dispositivo
             y = y.to(device)  # movemos los datos al dispositivo
             output = model(x)  # forward pass
             total_loss += criterion(output, y).item()  # acumulamos la perdida
-    return total_loss / len(data_loader)  # retornamos la perdida promedio
+            total_dice += dice_score(output, y).item()  # acumulamos el dice score
+    return total_loss / len(data_loader), total_dice / len(
+        data_loader
+    )  # retornamos la perdida promedio y el dice score promedio
 
 
 class EarlyStopping:
@@ -52,10 +57,11 @@ class EarlyStopping:
             self.counter = 0
 
 
-def print_log(epoch, train_loss, val_loss):
+def print_log(epoch, train_loss, val_loss, val_dice):
     print(
-        f"Epoch: {epoch + 1:03d} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}"
+        f"Epoch: {epoch + 1:03d} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f} | Val Dice: {val_dice:.5f}"
     )
+
 
 def train(
     model,
@@ -91,6 +97,8 @@ def train(
     """
     epoch_train_errors = []  # colectamos el error de traing para posterior analisis
     epoch_val_errors = []  # colectamos el error de validacion para posterior analisis
+    epoch_dice_scores = []  # colectamos el dice score de validacion para posterior analisis
+
     if do_early_stopping:
         early_stopping = EarlyStopping(
             patience=patience
@@ -117,17 +125,21 @@ def train(
 
         train_loss /= len(train_loader)  # calculamos la perdida promedio de la epoca
         epoch_train_errors.append(train_loss)  # guardamos la perdida de entrenamiento
-        val_loss = evaluate(
+
+        val_loss, val_dice = evaluate(
             model, criterion, val_loader, device
         )  # evaluamos el modelo en el conjunto de validacion
         epoch_val_errors.append(val_loss)  # guardamos la perdida de validacion
+        epoch_dice_scores.append(val_dice)  # guardamos el dice score de validacion
 
         if do_early_stopping:
             early_stopping(val_loss)  # llamamos al early stopping
 
         if log_fn is not None:  # si se pasa una funcion de log
             if (epoch + 1) % log_every == 0:  # loggeamos cada log_every epocas
-                log_fn(epoch, train_loss, val_loss)  # llamamos a la funcion de log
+                log_fn(
+                    epoch, train_loss, val_loss, val_dice
+                )  # llamamos a la funcion de log
 
         if do_early_stopping and early_stopping.early_stop:
             print(
@@ -135,7 +147,24 @@ def train(
             )
             break
 
-    return epoch_train_errors, epoch_val_errors
+    return epoch_train_errors, epoch_val_errors, epoch_dice_scores
+
+
+def dice_score(logits, targets, eps=1e-6):
+    """
+    logits: salida del modelo (B, 1, H, W), sin sigmoid
+    targets: máscara ground truth (B, 1, H, W), 0/1
+    """
+    probs = torch.sigmoid(logits)
+    preds = (probs > 0.5).float()
+
+    targets = targets.float()
+    # sumamos por batch y espacio
+    intersection = (preds * targets).sum(dim=(1, 2, 3))
+    union = preds.sum(dim=(1, 2, 3)) + targets.sum(dim=(1, 2, 3))
+
+    dice = (2 * intersection + eps) / (union + eps)
+    return dice.mean()
 
 
 def plot_taining(train_errors, val_errors):
