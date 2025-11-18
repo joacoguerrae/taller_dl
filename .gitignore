@@ -6,6 +6,7 @@ data/
 tarea_2/*.csv
 obligatorio/train
 obligatorio/test
+obligatorio/modelos/*.pth
 
 # === Carpetas temporales del sistema ===
 __MACOSX/
