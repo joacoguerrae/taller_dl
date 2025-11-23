@@ -1,4 +1,5 @@
 import torch
+import os
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
     accuracy_score,
@@ -75,6 +76,8 @@ def train(
     epochs=10,
     log_fn=print_log,
     log_every=1,
+    checkpoint_dir=None,
+    save_every=10         
 ):
     """
     Entrena el modelo utilizando el optimizador y la función de pérdida proporcionados.
@@ -95,9 +98,14 @@ def train(
         Tuple[List[float], List[float]]: Una tupla con dos listas, la primera con el error de entrenamiento de cada época y la segunda con el error de validación de cada época.
 
     """
+
+    if checkpoint_dir is not None:
+        os.makedirs(checkpoint_dir, exist_ok=True)
+
     epoch_train_errors = []  # colectamos el error de traing para posterior analisis
     epoch_val_errors = []  # colectamos el error de validacion para posterior analisis
     epoch_dice_scores = []  # colectamos el dice score de validacion para posterior analisis
+
 
     if do_early_stopping:
         early_stopping = EarlyStopping(
@@ -131,6 +139,13 @@ def train(
         )  # evaluamos el modelo en el conjunto de validacion
         epoch_val_errors.append(val_loss)  # guardamos la perdida de validacion
         epoch_dice_scores.append(val_dice)  # guardamos el dice score de validacion
+
+        if checkpoint_dir is not None and ((epoch + 1) % save_every == 0):
+            checkpoint_path = os.path.join(
+                checkpoint_dir,
+                f"checkpoint_epoch_{epoch+1}.pth"
+            )
+            torch.save(model.state_dict(), checkpoint_path)
 
         if do_early_stopping:
             early_stopping(val_loss)  # llamamos al early stopping
