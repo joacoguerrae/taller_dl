@@ -24,13 +24,33 @@ def evaluate(model, criterion, data_loader, device):
     total_loss = 0  # acumulador de la perdida
     total_dice = 0  # acumulador del dice score
 
+    # Mixed precision para evaluación también
+    from torch.cuda.amp import autocast
+
+    use_amp = torch.cuda.is_available()
+
     with torch.no_grad():  # deshabilitamos el calculo de gradientes
         for x, y in data_loader:  # iteramos sobre el dataloader
             x = x.to(device)  # movemos los datos al dispositivo
             y = y.to(device)  # movemos los datos al dispositivo
-            output = model(x)  # forward pass
-            total_loss += criterion(output, y).item()  # acumulamos la perdida
-            total_dice += dice_score(output, y).item()  # acumulamos el dice score
+
+            if use_amp:
+                with autocast():
+                    output = model(x)  # forward pass
+                    total_loss += criterion(output, y).item()  # acumulamos la perdida
+                    total_dice += dice_score(
+                        output, y
+                    ).item()  # acumulamos el dice score
+            else:
+                output = model(x)
+                total_loss += criterion(output, y).item()
+                total_dice += dice_score(output, y).item()
+
+            # Limpieza de memoria
+            del output
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
     return total_loss / len(data_loader), total_dice / len(
         data_loader
     )  # retornamos la perdida promedio y el dice score promedio
@@ -77,7 +97,7 @@ def train(
     log_fn=print_log,
     log_every=1,
     checkpoint_dir=None,
-    save_every=10         
+    save_every=10,
 ):
     """
     Entrena el modelo utilizando el optimizador y la función de pérdida proporcionados.
@@ -106,6 +126,11 @@ def train(
     epoch_val_errors = []  # colectamos el error de validacion para posterior analisis
     epoch_dice_scores = []  # colectamos el dice score de validacion para posterior analisis
 
+    # Mixed Precision Training - REDUCE MEMORIA EN 50%
+    from torch.cuda.amp import autocast, GradScaler
+
+    scaler = GradScaler()
+    use_amp = torch.cuda.is_available()
 
     if do_early_stopping:
         early_stopping = EarlyStopping(
@@ -121,15 +146,28 @@ def train(
 
             optimizer.zero_grad()  # reseteamos los gradientes
 
-            output = model(x)  # forward pass (prediccion)
-            batch_loss = criterion(
-                output, y
-            )  # calculamos la perdida con la salida esperada
+            # Forward pass con mixed precision
+            if use_amp:
+                with autocast():
+                    output = model(x)  # forward pass (prediccion)
+                    batch_loss = criterion(output, y)  # calculamos la perdida
 
-            batch_loss.backward()  # backpropagation
-            optimizer.step()  # actualizamos los pesos
+                # Backward con scaler
+                scaler.scale(batch_loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                output = model(x)
+                batch_loss = criterion(output, y)
+                batch_loss.backward()
+                optimizer.step()
 
             train_loss += batch_loss.item()  # acumulamos la perdida
+
+            # Limpieza de memoria después de cada batch
+            del output, batch_loss
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         train_loss /= len(train_loader)  # calculamos la perdida promedio de la epoca
         epoch_train_errors.append(train_loss)  # guardamos la perdida de entrenamiento
@@ -142,8 +180,7 @@ def train(
 
         if checkpoint_dir is not None and ((epoch + 1) % save_every == 0):
             checkpoint_path = os.path.join(
-                checkpoint_dir,
-                f"checkpoint_epoch_{epoch+1}.pth"
+                checkpoint_dir, f"checkpoint_epoch_{epoch + 1}.pth"
             )
             torch.save(model.state_dict(), checkpoint_path)
 
