@@ -186,6 +186,11 @@ def train(
 
         if do_early_stopping:
             early_stopping(val_loss)  # llamamos al early stopping
+            # si la perdida de validacion mejoro, guardamos el modelo en una variable temporal
+            if early_stopping.counter == 0 and checkpoint_dir is not None:
+                best_model_weights = model.state_dict().copy()
+                
+                
 
         if log_fn is not None:  # si se pasa una funcion de log
             if (epoch + 1) % log_every == 0:  # loggeamos cada log_every epocas
@@ -194,6 +199,13 @@ def train(
                 )  # llamamos a la funcion de log
 
         if do_early_stopping and early_stopping.early_stop:
+            # cargamos los mejores pesos guardados y guardamos los pesos en checkpoint_dir
+            if checkpoint_dir is not None:
+                model.load_state_dict(best_model_weights)
+                checkpoint_path = os.path.join(
+                    checkpoint_dir, f"best_model_epoch_{epoch + 1}.pth"
+                )
+                torch.save(model.state_dict(), checkpoint_path)
             print(
                 f"Detener entrenamiento en la época {epoch}, la mejor pérdida fue {early_stopping.best_score:.5f}"
             )
