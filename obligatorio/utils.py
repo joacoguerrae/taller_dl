@@ -24,32 +24,16 @@ def evaluate(model, criterion, data_loader, device):
     total_loss = 0  # acumulador de la perdida
     total_dice = 0  # acumulador del dice score
 
-    # Mixed precision para evaluación también
-    from torch.cuda.amp import autocast
-
-    use_amp = torch.cuda.is_available()
 
     with torch.no_grad():  # deshabilitamos el calculo de gradientes
         for x, y in data_loader:  # iteramos sobre el dataloader
             x = x.to(device)  # movemos los datos al dispositivo
             y = y.to(device)  # movemos los datos al dispositivo
 
-            if use_amp:
-                with autocast():
-                    output = model(x)  # forward pass
-                    total_loss += criterion(output, y).item()  # acumulamos la perdida
-                    total_dice += dice_score(
-                        output, y
-                    ).item()  # acumulamos el dice score
-            else:
-                output = model(x)
-                total_loss += criterion(output, y).item()
-                total_dice += dice_score(output, y).item()
+            output = model(x)  # forward pass
+            total_loss += criterion(output, y).item()  # acumulamos la perdida
+            total_dice += dice_score(output, y).item()  # acumulamos el dice score
 
-            # Limpieza de memoria
-            del output
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
 
     return total_loss / len(data_loader), total_dice / len(
         data_loader
@@ -126,11 +110,6 @@ def train(
     epoch_val_errors = []  # colectamos el error de validacion para posterior analisis
     epoch_dice_scores = []  # colectamos el dice score de validacion para posterior analisis
 
-    # Mixed Precision Training - REDUCE MEMORIA EN 50%
-    from torch.cuda.amp import autocast, GradScaler
-
-    scaler = GradScaler()
-    use_amp = torch.cuda.is_available()
 
     if do_early_stopping:
         early_stopping = EarlyStopping(
@@ -146,21 +125,14 @@ def train(
 
             optimizer.zero_grad()  # reseteamos los gradientes
 
-            # Forward pass con mixed precision
-            if use_amp:
-                with autocast():
-                    output = model(x)  # forward pass (prediccion)
-                    batch_loss = criterion(output, y)  # calculamos la perdida
+            output = model(x)  # forward pass (prediccion)
+            batch_loss = criterion(
+                output, y
+            )  # calculamos la perdida con la salida esperada
 
-                # Backward con scaler
-                scaler.scale(batch_loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                output = model(x)
-                batch_loss = criterion(output, y)
-                batch_loss.backward()
-                optimizer.step()
+            batch_loss.backward()  # backpropagation
+            optimizer.step()  # actualizamos los pesos
+
 
             train_loss += batch_loss.item()  # acumulamos la perdida
 
