@@ -24,7 +24,6 @@ def evaluate(model, criterion, data_loader, device):
     total_loss = 0  # acumulador de la perdida
     total_dice = 0  # acumulador del dice score
 
-
     with torch.no_grad():  # deshabilitamos el calculo de gradientes
         for x, y in data_loader:  # iteramos sobre el dataloader
             x = x.to(device)  # movemos los datos al dispositivo
@@ -33,7 +32,6 @@ def evaluate(model, criterion, data_loader, device):
             output = model(x)  # forward pass
             total_loss += criterion(output, y).item()  # acumulamos la perdida
             total_dice += dice_score(output, y).item()  # acumulamos el dice score
-
 
     return total_loss / len(data_loader), total_dice / len(
         data_loader
@@ -110,7 +108,6 @@ def train(
     epoch_val_errors = []  # colectamos el error de validacion para posterior analisis
     epoch_dice_scores = []  # colectamos el dice score de validacion para posterior analisis
 
-
     if do_early_stopping:
         early_stopping = EarlyStopping(
             patience=patience
@@ -132,7 +129,6 @@ def train(
 
             batch_loss.backward()  # backpropagation
             optimizer.step()  # actualizamos los pesos
-
 
             train_loss += batch_loss.item()  # acumulamos la perdida
 
@@ -161,8 +157,6 @@ def train(
             # si la perdida de validacion mejoro, guardamos el modelo en una variable temporal
             if early_stopping.counter == 0 and checkpoint_dir is not None:
                 best_model_weights = model.state_dict().copy()
-                
-                
 
         if log_fn is not None:  # si se pasa una funcion de log
             if (epoch + 1) % log_every == 0:  # loggeamos cada log_every epocas
